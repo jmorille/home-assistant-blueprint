@@ -79,7 +79,8 @@ action:
       aqara_compute_temperature_max: >-
         {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | max }}
       aqara_compute_temperature: >-
-        {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | min }}
+        {% set external_temp_list = expand(external_temp_sensor)  | map(attribute='state') | map('float')  | list -%}
+        {{ ((external_temp_list | sum) / (external_temp_list | count)) | round(2) }}        
   - parallel:
       - if:
           - condition: or
