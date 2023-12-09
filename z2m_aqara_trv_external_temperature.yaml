@@ -92,7 +92,7 @@ action:
         sequence:
           - service: climate.turn_off
             target:
-              entity_id: "{{aqara_trv_select_entity}}"
+              entity_id: "{{aqara_trv_device}}"
             data: {}
       - conditions:
           - condition: trigger
@@ -101,5 +101,5 @@ action:
         sequence:
           - service: climate.turn_on
             target:
-              entity_id: "{{aqara_trv_select_entity}}"
+              entity_id: "{{aqara_trv_device}}"
             data: {}
