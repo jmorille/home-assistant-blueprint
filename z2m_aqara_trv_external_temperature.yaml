@@ -103,9 +103,14 @@ action:
               entity_id: "{{aqara_trv_climate_entity}}"
             data: {}
       - conditions:
-          - condition: trigger
-            id:
-              - window-close
+          - condition: and
+            conditions:
+              - condition: trigger
+                id:
+                  - window-close
+              - condition: template
+                value_template: >-
+                  {{ expand(external_contact_sensor) |  selectattr('state', 'eq', 'on')  | list | count == 0 }}
         sequence:
           - service: climate.turn_on
             target:
