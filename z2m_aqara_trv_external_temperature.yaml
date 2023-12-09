@@ -18,7 +18,7 @@ blueprint:
               - temperature
     external_contact_sensor:
       name: External contact sensor
-      description: This contact sensor values will be synced to the TRV
+      description: Doors Contact sensor values will shut off the TRV
       selector:
         entity:
           multiple: true
