@@ -61,13 +61,12 @@ action:
       aqara_trv_device_name: "{{ device_attr(aqara_trv_device, 'name') }}"
       aqara_trv_select_entity: >-
         {% set device_entities = device_entities(aqara_trv_device) %}
-        {{ expand(device_entities(aqara_trv_device))
+        {{ expand(device_entities)
                   | selectattr('attributes.options', 'contains', 'external')
                   | map(attribute='entity_id') 
                   | first
         }}
       aqara_trv_climate_entity:  >-
-        {% set device_entities = device_entities(aqara_trv_device) %}
         {{ expand(device_entities(aqara_trv_device))
                   | selectattr('attributes.hvac_modes', 'contains', 'off')
                   | map(attribute='entity_id') 
