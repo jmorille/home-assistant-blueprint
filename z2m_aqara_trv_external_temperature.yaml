@@ -14,16 +14,16 @@ blueprint:
           filter:
             domain: sensor
             device_class:
-              - door
+              - temperature
     external_contact_sensor:
       name: External contact sensor
       description: This contact sensor values will be synced to the TRV
       selector:
         entity:
           filter:
-            domain: sensor
+            domain: binary_sensor
             device_class:
-              - contact
+              - door
     aqara_trv_device:
       name: The Aqara TRV
       description: The TRV that the temperature willl be set to
