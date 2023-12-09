@@ -11,7 +11,7 @@ blueprint:
       description: This temperature sensor values will be synced to the TRV
       selector:
         entity:
-          multiple: false
+          multiple: true
           filter:
             domain: sensor
             device_class:
@@ -74,6 +74,11 @@ action:
                   | map(attribute='entity_id') 
                   | first
         }} 
+      compute_temperature_min: >-
+        {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | min   }}
+      compute_temperature_max: >-
+        {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | min   }}
+      compute_temperature: {{ compute_temperature_min  }}
 
   - parallel:
       - if:
@@ -99,7 +104,7 @@ action:
             data:
               topic: "zigbee2mqtt/{{aqara_trv_device_name}}/set/sensor_temp"
               payload_template: >-
-                {{ (states(external_temp_sensor)|float(0)) }}
+                {{ compute_temperature }}
       - choose:
           - conditions:
               - condition: trigger
