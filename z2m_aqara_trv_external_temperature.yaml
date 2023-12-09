@@ -112,7 +112,7 @@ action:
             data:
               topic: "zigbee2mqtt/{{aqara_trv_device_name}}/set/sensor_temp"
               payload_template: >-
-                 {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | min }}
+                 {{ aqara_compute_temperature | float }}
       - choose:
           - conditions:
               - condition: trigger
