@@ -74,12 +74,12 @@ action:
                   | map(attribute='entity_id') 
                   | first
         }} 
-      compute_temperature_min: >-
+      aqara_compute_temperature_min: >-
         {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | min 
         }}
-      compute_temperature_max: >-
+      aqara_compute_temperature_max: >-
         {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | max }}
-      compute_temperature: >-
+      aqara_compute_temperature: >-
         {{ compute_temperature_min 
         }}
 
