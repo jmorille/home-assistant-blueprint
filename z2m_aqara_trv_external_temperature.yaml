@@ -75,7 +75,7 @@ action:
                   | first
         }} 
       aqara_compute_temperature: >-
-        {% set external_temp_ops = 'avg' -%}
+        {% set external_temp_ops = 'min' -%}
         {% set external_temp_list = expand(external_temp_sensor)  | map(attribute='state') | map('float')  | list -%}
         {% if external_temp_ops == 'min' -%}
           {{ external_temp_list | min   }}
