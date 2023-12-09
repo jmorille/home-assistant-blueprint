@@ -11,6 +11,7 @@ blueprint:
       description: This temperature sensor values will be synced to the TRV
       selector:
         entity:
+          multiple: false
           filter:
             domain: sensor
             device_class:
@@ -20,6 +21,7 @@ blueprint:
       description: This contact sensor values will be synced to the TRV
       selector:
         entity:
+          multiple: false
           filter:
             domain: binary_sensor
             device_class:
@@ -65,6 +67,15 @@ action:
                   | map(attribute='entity_id') 
                   | first
         }}
+      aqara_trv_climate_entity: >-
+        {% set device_entities = device_entities(aqara_trv_device) %}
+        {{ expand(states['select'])   
+                  | selectattr('entity_id','in', device_entities)
+                  | selectattr('hvac_modes', 'in', 'off')
+                  | map(attribute='entity_id') 
+                  | first
+        }}
+
   - if:
       - condition: template
         value_template: "{{ not is_state(aqara_trv_select_entity, 'external')}}"
@@ -92,7 +103,7 @@ action:
         sequence:
           - service: climate.turn_off
             target:
-              entity_id: "{{aqara_trv_device}}"
+              entity_id: "{{aqara_trv_climate_entity}}"
             data: {}
       - conditions:
           - condition: trigger
@@ -101,5 +112,5 @@ action:
         sequence:
           - service: climate.turn_on
             target:
-              entity_id: "{{aqara_trv_device}}"
+              entity_id: "{{aqara_trv_climate_entity}}"
             data: {}
