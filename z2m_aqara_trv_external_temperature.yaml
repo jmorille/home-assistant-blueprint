@@ -78,8 +78,6 @@ action:
         {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | min }}
       aqara_compute_temperature_max: >-
         {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | max }}
-      aqara_compute_temperature: >-
-        {{ compute_temperature_min }}
 
   - parallel:
       - if:
