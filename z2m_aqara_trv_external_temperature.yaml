@@ -74,13 +74,17 @@ action:
                   | map(attribute='entity_id') 
                   | first
         }} 
-      aqara_compute_temperature_min: >-
-        {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | min }}
-      aqara_compute_temperature_max: >-
-        {{ expand(external_temp_sensor)  | map(attribute='state') | map('float') | max }}
       aqara_compute_temperature: >-
+        {% set external_temp_ops = 'avg' -%}
         {% set external_temp_list = expand(external_temp_sensor)  | map(attribute='state') | map('float')  | list -%}
-        {{ ((external_temp_list | sum) / (external_temp_list | count)) | round(2) }}        
+        {% if external_temp_ops == 'min' -%}
+          {{ external_temp_list | min   }}
+        {%- elif external_temp_ops == 'max' -%}
+          {{external_temp_list | max   }}
+        {%- else -%}
+          {{ ((external_temp_list | sum) / (external_temp_list | count)) | round(2) }}
+        {%- endif %} 
+
   - parallel:
       - if:
           - condition: or
