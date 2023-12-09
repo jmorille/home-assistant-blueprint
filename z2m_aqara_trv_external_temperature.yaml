@@ -74,26 +74,27 @@ action:
                   | map(attribute='entity_id') 
                   | first
         }} 
-  - if:
-      - condition: template
-        value_template: "{{ not is_state(aqara_trv_select_entity, 'external')}}"
-    then:
-      - service: select.select_option
-        target:
-          entity_id: "{{aqara_trv_select_entity}}"
-        data:
-          option: external
-      - delay:
-          hours: 0
-          minutes: 0
-          seconds: 1
-          milliseconds: 0
+
   - parallel:
       - if:
           - condition: trigger
             id:
               - temp-change
         then:
+          - if:
+              - condition: template
+                value_template: "{{ not is_state(aqara_trv_select_entity, 'external')}}"
+            then:
+              - service: select.select_option
+                target:
+                  entity_id: "{{aqara_trv_select_entity}}"
+                data:
+                  option: external
+              - delay:
+                  hours: 0
+                  minutes: 0
+                  seconds: 1
+                  milliseconds: 0        
           - service: mqtt.publish
             data:
               topic: "zigbee2mqtt/{{aqara_trv_device_name}}/set/sensor_temp"
