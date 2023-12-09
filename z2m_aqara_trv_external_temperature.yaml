@@ -65,4 +65,4 @@ action:
     data:
       topic: "zigbee2mqtt/{{aqara_trv_device_name}}/set/sensor_temp"
       payload_template: >-
-        {{ (states(external_temp_sensor)|float(0)|round(1)) }}
+        {{ (states(external_temp_sensor)|float(0)) }}
