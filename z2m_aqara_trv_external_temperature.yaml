@@ -14,7 +14,7 @@ blueprint:
           filter:
             domain: sensor
             device_class:
-              - temperature
+              - door
     external_contact_sensor:
       name: External contact sensor
       description: This contact sensor values will be synced to the TRV
