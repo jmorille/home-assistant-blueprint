@@ -21,7 +21,7 @@ blueprint:
       description: This contact sensor values will be synced to the TRV
       selector:
         entity:
-          multiple: false
+          multiple: true
           filter:
             domain: binary_sensor
             device_class:
