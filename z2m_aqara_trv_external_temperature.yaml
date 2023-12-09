@@ -37,7 +37,7 @@ blueprint:
               manufacturer: Xiaomi
               model: Aqara Smart Radiator Thermostat E1 (SRTS-A01)
 
-mode: single
+mode: restart
 max_exceeded: silent
 
 variables:
