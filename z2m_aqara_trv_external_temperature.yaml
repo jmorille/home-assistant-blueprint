@@ -67,14 +67,7 @@ action:
                   | map(attribute='entity_id') 
                   | first
         }}
-      aqara_trv_climate_entity: >-
-        {% set device_entities = device_entities(aqara_trv_device) %}
-        {{ expand(states['select'])   
-                  | selectattr('entity_id','in', device_entities)
-                  | selectattr('hvac_modes', 'in', 'off')
-                  | map(attribute='entity_id') 
-                  | first
-        }}
+      aqara_trv_climate_entity: "{{ 'climate.'+aqara_trv_device_name }}"
 
   - if:
       - condition: template
