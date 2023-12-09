@@ -66,7 +66,7 @@ action:
                   | map(attribute='entity_id') 
                   | first
         }}
-      aqara_trv_climate_entity:  >-
+      aqara_trv_climate_entity: >-
         {{ expand(device_entities(aqara_trv_device))
                   | selectattr('attributes.hvac_modes', 'contains', 'off')
                   | map(attribute='entity_id') 
