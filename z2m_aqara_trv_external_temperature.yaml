@@ -46,6 +46,14 @@ variables:
 trigger:
   - platform: state
     entity_id: !input external_temp_sensor
+  - platform: state
+    entity_id: !input external_contact_sensor
+    to: "on"
+    id: window-open
+  - platform: state
+    entity_id: !input external_contact_sensor
+    to: "off"
+    id: window-close
 action:
   - variables:
       aqara_trv_device_name: "{{ device_attr(aqara_trv_device, 'name') }}"
@@ -76,3 +84,22 @@ action:
       topic: "zigbee2mqtt/{{aqara_trv_device_name}}/set/sensor_temp"
       payload_template: >-
         {{ (states(external_temp_sensor)|float(0)) }}
+  - choose:
+      - conditions:
+          - condition: trigger
+            id:
+              - window-open
+        sequence:
+          - service: climate.turn_off
+            target:
+              entity_id: climate.bureau_radiator
+            data: {}
+      - conditions:
+          - condition: trigger
+            id:
+              - window-close
+        sequence:
+          - service: climate.turn_on
+            target:
+              device_id: climate.bureau_radiator
+            data: {}
