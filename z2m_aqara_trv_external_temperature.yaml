@@ -101,5 +101,5 @@ action:
         sequence:
           - service: climate.turn_on
             target:
-              device_id: "{{aqara_trv_select_entity}}"
+              entity_id: "{{aqara_trv_select_entity}}"
             data: {}
