@@ -8,7 +8,7 @@ blueprint:
   input:
     external_temp_sensor:
       name: External temperature sensor
-      description: This temperature sensor values will be synced to the TRV
+      description: This temperature sensors from min values
       selector:
         entity:
           multiple: true
