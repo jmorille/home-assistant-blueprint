@@ -15,7 +15,7 @@ blueprint:
             - min
             - max
             - avg
-      default: min 
+      default: avg 
     external_temp_sensor:
       name: External temperature sensor
       description: This temperature sensors from min values
