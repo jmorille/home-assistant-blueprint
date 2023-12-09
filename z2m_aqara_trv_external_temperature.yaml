@@ -52,6 +52,7 @@ max_exceeded: silent
 
 variables:
   aqara_trv_device: !input aqara_trv_device
+  external_temp_comparator: !input external_temp_comparator
   external_temp_sensor: !input external_temp_sensor
   external_contact_sensor: !input external_contact_sensor
 
@@ -85,14 +86,13 @@ action:
                   | first
         }} 
       aqara_compute_temperature: >-
-        {% set external_temp_ops = 'min' -%}
         {% set external_temp_list = expand(external_temp_sensor)  | map(attribute='state') | map('float')  | list -%}
-        {% if external_temp_ops == 'min' -%}
+        {% if external_temp_comparator == 'min' -%}
           {{ external_temp_list | min   }}
-        {%- elif external_temp_ops == 'max' -%}
+        {%- elif external_temp_comparator == 'max' -%}
           {{external_temp_list | max   }}
         {%- else -%}
-          {{ ((external_temp_list | sum) / (external_temp_list | count)) | round(2) }}
+          {{ ((external_temp_list | sum) / (external_temp_list | count)) | round(3) }}
         {%- endif %} 
 
   - parallel:
