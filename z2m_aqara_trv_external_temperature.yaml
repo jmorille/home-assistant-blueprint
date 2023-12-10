@@ -21,11 +21,11 @@ blueprint:
       selector:
         select:
           options:
-            - first
-            - last
             - min
             - max
             - avg
+            - first
+            - last
       default: avg
 
     external_contact_sensor:
