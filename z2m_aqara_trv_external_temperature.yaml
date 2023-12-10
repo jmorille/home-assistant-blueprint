@@ -143,6 +143,7 @@ action:
                   milliseconds: 0 
           # ### Publish external temperature ### #
           # ### ############################ ### #      
+          # Repeat for all names
           - repeat:
               for_each: "{{aqara_trv_device_name}}"
               sequence:
