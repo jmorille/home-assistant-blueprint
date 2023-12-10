@@ -125,6 +125,7 @@ action:
           # ### Check TRV config from external temperature sensor ### #
           # ### ################################################# ### #      
           - variables:
+              # Get all in internal states for change it   
               aqara_trv_select_entity_internal: "{{ aqara_trv_select_entity | expand | selectattr('state', 'eq', 'internal')  | map(attribute='entity_id')  | list }}"
 
           - if:
@@ -141,6 +142,7 @@ action:
                   minutes: 0
                   seconds: 1
                   milliseconds: 0 
+                  
           # ### Publish external temperature ### #
           # ### ############################ ### #      
           # Repeat for all names
