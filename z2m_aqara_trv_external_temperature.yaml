@@ -15,7 +15,7 @@ blueprint:
             domain: sensor
             device_class:
               - temperature
-        default: {}              
+        default: []             
     external_temp_comparator:
       name: Temperature comparator from sensors
       description: This temperature comparator from sensors values
@@ -39,7 +39,7 @@ blueprint:
             domain: binary_sensor
             device_class:
               - door
-        default: {}
+        default: []
         
     aqara_trv_shutoff:
       name: Aqara TRV shutoff methods
