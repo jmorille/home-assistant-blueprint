@@ -39,13 +39,13 @@ blueprint:
             device_class:
               - door
     aqara_trv_shutoff:
-      name: Device shutoff methods
-      description: Device Shutoff methodss
+      name: Aqara TRV shutoff methods
+      description: The shutoff when contact is open
       selector:
         select:
           options:
-            - awayed
-            - offed
+            - away
+            - off
       default: offed
 
     aqara_trv_device:
