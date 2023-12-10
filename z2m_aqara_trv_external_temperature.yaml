@@ -87,8 +87,6 @@ action:
                   | map(attribute='entity_id') 
                   | first
         }} 
-# Compute the target temperature algo
-# #####################################
       aqara_compute_temperature: >-
         {% set external_temp_list = expand(external_temp_sensor)  | map(attribute='state') | map('float')  | list -%}
         {% if external_temp_comparator == 'min' -%}
@@ -104,8 +102,6 @@ action:
         {%- endif %} 
 
   - parallel:
-# Publish external Temperature
-# #####################################
       - if:
           - condition: or
             conditions: 
@@ -138,8 +134,6 @@ action:
               topic: "zigbee2mqtt/{{aqara_trv_device_name}}/set/sensor_temp"
               payload_template: >-
                  {{ aqara_compute_temperature | float }}
-# Turn On/Off the TRV
-# #####################################
       - choose:
           - conditions:
               - condition: trigger
