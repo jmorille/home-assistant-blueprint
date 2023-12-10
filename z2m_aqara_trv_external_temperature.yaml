@@ -144,7 +144,7 @@ action:
           # ### Publish external temperature ### #
           # ### ############################ ### #      
           - repeat:
-              for_each: {{aqara_trv_device_name}}
+              for_each: "{{aqara_trv_device_name}}"
               sequence:
                 - service: mqtt.publish
                   data:
