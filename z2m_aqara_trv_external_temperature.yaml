@@ -15,6 +15,7 @@ blueprint:
             domain: sensor
             device_class:
               - temperature
+        default: {}              
     external_temp_comparator:
       name: Temperature comparator from sensors
       description: This temperature comparator from sensors values
@@ -38,6 +39,8 @@ blueprint:
             domain: binary_sensor
             device_class:
               - door
+        default: {}
+        
     aqara_trv_shutoff:
       name: Aqara TRV shutoff methods
       description: The shutoff when contact is open
@@ -124,6 +127,8 @@ action:
                 id:
                   - window-open
         then:
+          # ### Check TRV config from external temperature sensor ### #
+          # ### ################################################# ### #      
           - if:
               - condition: template
                 value_template: "{{ not is_state(aqara_trv_select_entity, 'external')}}"
@@ -163,6 +168,7 @@ action:
                       - condition: template
                         value_template: "{{ aqara_trv_shutoff == 'close' }}"
                     sequence:
+                      # Radiator OFF: by Turn Off Service
                       - service: climate.turn_off
                         target:
                           entity_id: "{{aqara_trv_climate_entity}}"
@@ -171,6 +177,7 @@ action:
                       - condition: template
                         value_template: "{{ aqara_trv_shutoff == 'away' }}"
                     sequence:
+                      # Radiator OFF: by Preset Away Mode config temp consigne 
                       - service: climate.set_preset_mode
                         target:
                           entity_id: "{{aqara_trv_climate_entity}}"
@@ -189,12 +196,13 @@ action:
                     value_template: >-
                       {{ expand(external_contact_sensor) |  selectattr('state', 'eq', 'on')  | list | count == 0 }}
             sequence:
-              # Radiator Turn ON
+              # Radiator check Turn ON Method
               - choose:
                   - conditions:
                       - condition: template
                         value_template: "{{ aqara_trv_shutoff == 'close' }}"
                     sequence:
+                      # Radiator ON: by Turn On Service
                       - service: climate.turn_on
                         target:
                           entity_id: "{{aqara_trv_climate_entity}}"
@@ -203,6 +211,7 @@ action:
                       - condition: template
                         value_template: "{{ aqara_trv_shutoff == 'away' }}"
                     sequence:
+                      # Radiator ON: by Preset Auto Mode config temp consigne 
                       - service: climate.set_preset_mode
                         target:
                           entity_id: "{{aqara_trv_climate_entity}}"
