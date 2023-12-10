@@ -20,10 +20,14 @@ blueprint:
       description: This temperature comparator from sensors values
       selector:
         select:
+        select:
           options:
             - first
             - last
-      default: first 
+            - min
+            - max
+            - avg
+      default: avg
     aqara_trv_shutoff_method:
       name: Shutoff method for radiator
       description: The shutoff method when the windows is opens
@@ -32,10 +36,7 @@ blueprint:
           options:
             - first
             - last
-            - min
-            - max
-            - avg
-      default: avg 
+      default: first
     external_contact_sensor:
       name: External contact sensor
       description: Doors Contact sensor values will shut off the TRV
