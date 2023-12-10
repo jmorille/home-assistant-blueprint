@@ -23,10 +23,7 @@ blueprint:
           options:
             - first
             - last
-            - min
-            - max
-            - avg
-      default: avg 
+      default: first 
     aqara_trv_shutoff_method:
       name: Shutoff method for radiator
       description: The shutoff method when the windows is opens
