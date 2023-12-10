@@ -136,13 +136,17 @@ action:
                   hours: 0
                   minutes: 0
                   seconds: 1
-                  milliseconds: 0        
+                  milliseconds: 0 
+          # ### Publish external temperature ### #
+          # ### ############################ ### #      
           - service: mqtt.publish
             data:
               topic: "zigbee2mqtt/{{aqara_trv_device_name}}/set/sensor_temp"
               payload_template: >-
                  {{ aqara_compute_temperature | float }}
       - choose:
+          # ### Test Radiator for Turn OFF ### #
+          # ### ########################## ### #      
           - conditions:
               - condition: trigger
                 id:
@@ -152,6 +156,28 @@ action:
                 target:
                   entity_id: "{{aqara_trv_climate_entity}}"
                 data: {}
+              # Radiator Turn OFF
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ aqara_trv_shutoff == 'close' }}"
+                    sequence:
+                      - service: climate.turn_off
+                        target:
+                          entity_id: "{{aqara_trv_climate_entity}}"
+                        data: {}
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ aqara_trv_shutoff == 'away' }}"
+                    sequence:
+                      - service: climate.set_preset_mode
+                        target:
+                          entity_id: "{{aqara_trv_climate_entity}}"
+                        data:
+                          preset_mode: away
+
+          # ### Test Radiator for Turn ON  ### #
+          # ### ########################## ### #
           - conditions:
               - condition: and
                 conditions:
@@ -162,7 +188,22 @@ action:
                     value_template: >-
                       {{ expand(external_contact_sensor) |  selectattr('state', 'eq', 'on')  | list | count == 0 }}
             sequence:
-              - service: climate.turn_on
-                target:
-                  entity_id: "{{aqara_trv_climate_entity}}"
-                data: {}
+              # Radiator Turn ON
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ aqara_trv_shutoff == 'close' }}"
+                    sequence:
+                      - service: climate.turn_on
+                        target:
+                          entity_id: "{{aqara_trv_climate_entity}}"
+                        data: {}
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ aqara_trv_shutoff == 'away' }}"
+                    sequence:
+                      - service: climate.set_preset_mode
+                        target:
+                          entity_id: "{{aqara_trv_climate_entity}}"
+                        data:
+                          preset_mode: auto
