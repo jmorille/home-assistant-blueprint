@@ -27,15 +27,7 @@ blueprint:
             - max
             - avg
       default: avg
-    aqara_trv_shutoff:
-      name: Device shutoff methods
-      description: Device Shutoff methodss
-      selector:
-        select:
-          options:
-            - awayed
-            - offed
-      default: offed
+
     external_contact_sensor:
       name: External contact sensor
       description: Doors Contact sensor values will shut off the TRV
@@ -46,6 +38,16 @@ blueprint:
             domain: binary_sensor
             device_class:
               - door
+    aqara_trv_shutoff:
+      name: Device shutoff methods
+      description: Device Shutoff methodss
+      selector:
+        select:
+          options:
+            - awayed
+            - offed
+      default: offed
+
     aqara_trv_device:
       name: The Aqara TRV
       description: The TRV that the temperature willl be set to
