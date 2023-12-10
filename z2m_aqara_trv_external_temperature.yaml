@@ -115,12 +115,6 @@ action:
               - condition: trigger
                 id:
                   - temp-change
-              - condition: trigger
-                id:
-                  - window-close
-              - condition: trigger
-                id:
-                  - window-open
         then:
           # ### Check TRV config from external temperature sensor ### #
           # ### ################################################# ### #      
