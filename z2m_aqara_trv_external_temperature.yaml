@@ -66,6 +66,7 @@ variables:
   external_temp_sensor: !input external_temp_sensor
   external_temp_comparator: !input external_temp_comparator
   external_contact_sensor: !input external_contact_sensor
+  aqara_trv_shutoff: !input aqara_trv_shutoff
 trigger:
   - platform: state
     entity_id: !input external_temp_sensor
