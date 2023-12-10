@@ -12,6 +12,8 @@ blueprint:
       selector:
         select:
           options:
+            - first
+            - last
             - min
             - max
             - avg
@@ -85,17 +87,25 @@ action:
                   | map(attribute='entity_id') 
                   | first
         }} 
+# Compute the target temperature algo
+# #####################################
       aqara_compute_temperature: >-
         {% set external_temp_list = expand(external_temp_sensor)  | map(attribute='state') | map('float')  | list -%}
         {% if external_temp_comparator == 'min' -%}
           {{ external_temp_list | min   }}
         {%- elif external_temp_comparator == 'max' -%}
           {{external_temp_list | max   }}
+        {%- elif external_temp_comparator == 'first' -%}
+          {{external_temp_list | first   }}          
+        {%- elif external_temp_comparator == 'last' -%}
+          {{external_temp_list | last   }}          
         {%- else -%}
           {{ ((external_temp_list | sum) / (external_temp_list | count)) | round(3) }}
         {%- endif %} 
 
   - parallel:
+# Publish external Temperature
+# #####################################
       - if:
           - condition: or
             conditions: 
@@ -128,6 +138,8 @@ action:
               topic: "zigbee2mqtt/{{aqara_trv_device_name}}/set/sensor_temp"
               payload_template: >-
                  {{ aqara_compute_temperature | float }}
+# Turn On/Off the TRV
+# #####################################
       - choose:
           - conditions:
               - condition: trigger
