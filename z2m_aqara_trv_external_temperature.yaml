@@ -1,8 +1,7 @@
 blueprint:
   name: Aqara TRV E1 external temperature
   description: >
-    Configures the Aqara TRV to receive it's temperature from an external sensor.
-    Every time the temperature & door sensor value changes it's is send to the TRV.
+    Manage the Aqara TRV from external temperature sensor event or door contact event.
   domain: automation
   source_url: "https://github.com/jmorille/home-assistant-blueprint/z2m_aqara_trv_external_temperature.yaml"
   input:
