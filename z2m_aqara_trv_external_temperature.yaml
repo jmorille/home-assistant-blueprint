@@ -28,7 +28,6 @@ blueprint:
             - max
             - avg
       default: avg 
-
     external_contact_sensor:
       name: External contact sensor
       description: Doors Contact sensor values will shut off the TRV
@@ -39,7 +38,6 @@ blueprint:
             domain: binary_sensor
             device_class:
               - door
-
     aqara_trv_shutoff_method:
       name: Shutoff method for radiator
       description: The shutoff method when the windows is opens
@@ -49,8 +47,6 @@ blueprint:
             - off
             - away
       default: away 
-
-    
     aqara_trv_device:
       name: The Aqara TRV
       description: The TRV that the temperature willl be set to
@@ -61,7 +57,6 @@ blueprint:
             - integration: mqtt
               manufacturer: Xiaomi
               model: Aqara Smart Radiator Thermostat E1 (SRTS-A01)
-
 mode: restart
 max_exceeded: silent
 
