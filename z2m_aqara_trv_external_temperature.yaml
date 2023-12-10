@@ -38,6 +38,15 @@ blueprint:
             domain: binary_sensor
             device_class:
               - door
+    aqara_trv_shutoff_method:
+      name: Shutoff method for radiator
+      description: The shutoff method when the windows is opens
+      selector:
+        select:
+          options:
+            - off
+            - away
+      default: away 
     aqara_trv_device:
       name: The Aqara TRV
       description: The TRV that the temperature willl be set to
