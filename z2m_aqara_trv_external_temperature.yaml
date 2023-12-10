@@ -54,7 +54,7 @@ blueprint:
       description: The TRV that the temperature willl be set to
       selector:
         device:
-          multiple: false
+          multiple: true
           filter:
             - integration: mqtt
               manufacturer: Xiaomi
@@ -68,6 +68,7 @@ variables:
   external_temp_comparator: !input external_temp_comparator
   external_contact_sensor: !input external_contact_sensor
   aqara_trv_shutoff: !input aqara_trv_shutoff
+  
 trigger:
   - platform: state
     entity_id: !input external_temp_sensor
@@ -82,21 +83,17 @@ trigger:
     id: window-close
 action:
   - variables:
-      aqara_trv_device_name: "{{ device_attr(aqara_trv_device, 'name') }}"
-      aqara_trv_select_entity: >-
-        {% set device_entities = device_entities(aqara_trv_device) %}
-        {{ expand(device_entities)
-                  | selectattr('attributes.options', 'contains', 'external')
-                  | map(attribute='entity_id') 
-                  | first
+      aqara_trv_device_name: "{{ aqara_trv_device | map('device_attr', 'name') | list }}"
+      aqara_trv_select_entity: >-   
+        {{ aqara_trv_device | map('device_entities') | sum(start=[]) | expand
+        | selectattr('attributes.options', 'contains', 'external')
+        | map(attribute='entity_id') | list
         }}
       aqara_trv_climate_entity: >-
-        {% set device_entities = device_entities(aqara_trv_device) %}
-        {{ expand(device_entities)
-                  | selectattr('attributes.hvac_modes', 'contains', 'off')
-                  | map(attribute='entity_id') 
-                  | first
-        }} 
+        {{ aqara_trv_device | map('device_entities') | sum(start=[]) | expand
+        | selectattr('attributes.hvac_modes', 'contains', 'off')
+        | map(attribute='entity_id') | list 
+        }}
       aqara_compute_temperature: >-
         {% set external_temp_list = expand(external_temp_sensor)  | map(attribute='state') | map('float')  | list -%}
         {% if external_temp_comparator == 'min' -%}
@@ -127,13 +124,16 @@ action:
         then:
           # ### Check TRV config from external temperature sensor ### #
           # ### ################################################# ### #      
+          - variables:
+              aqara_trv_select_entity_internal: "{{ aqara_trv_select_entity | expand | selectattr('state', 'eq', 'internal')  | map(attribute='entity_id')  | list }}"
+
           - if:
               - condition: template
-                value_template: "{{ not is_state(aqara_trv_select_entity, 'external')}}"
+                value_template: "{{ aqara_trv_select_entity_internal | count > 0 }}"
             then:
               - service: select.select_option
                 target:
-                  entity_id: "{{aqara_trv_select_entity}}"
+                  entity_id: "{{ aqara_trv_select_entity_internal }}"
                 data:
                   option: external
               - delay:
@@ -143,11 +143,14 @@ action:
                   milliseconds: 0 
           # ### Publish external temperature ### #
           # ### ############################ ### #      
-          - service: mqtt.publish
-            data:
-              topic: "zigbee2mqtt/{{aqara_trv_device_name}}/set/sensor_temp"
-              payload_template: >-
-                 {{ aqara_compute_temperature | float }}
+          - repeat:
+              for_each: {{aqara_trv_device_name}}
+              sequence:
+                - service: mqtt.publish
+                  data:
+                    topic: "zigbee2mqtt/{{ repeat.item }}/set/sensor_temp"
+                    payload_template: >-
+                       {{ aqara_compute_temperature | float }}
       - choose:
           # ### Test Radiator for Turn OFF ### #
           # ### ########################## ### #      
