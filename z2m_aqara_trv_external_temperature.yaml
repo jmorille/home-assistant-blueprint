@@ -15,7 +15,7 @@ blueprint:
             domain: sensor
             device_class:
               - temperature
-        default: []             
+        default:
     external_temp_comparator:
       name: Temperature comparator from sensors
       description: This temperature comparator from sensors values
