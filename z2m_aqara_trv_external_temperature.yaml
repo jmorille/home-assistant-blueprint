@@ -34,9 +34,9 @@ blueprint:
       selector:
         select:
           options:
-            - first
-            - last
-      default: first
+            - away
+            - off
+      default: away
     external_contact_sensor:
       name: External contact sensor
       description: Doors Contact sensor values will shut off the TRV
