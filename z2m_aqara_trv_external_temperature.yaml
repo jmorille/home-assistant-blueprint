@@ -44,8 +44,8 @@ blueprint:
       selector:
         select:
           options:
-            - 'away'
-            - 'off'
+            - away
+            - close
       default: away
 
     aqara_trv_device:
