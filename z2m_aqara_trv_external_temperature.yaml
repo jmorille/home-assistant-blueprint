@@ -27,15 +27,7 @@ blueprint:
             - max
             - avg
       default: avg
-    aqara_trv_shutoff_method:
-      name: Shutoff method for radiator
-      description: The shutoff method when the windows is opens
-      selector:
-        select:
-          options:
-            - away
-            - off
-      default: away
+
     external_contact_sensor:
       name: External contact sensor
       description: Doors Contact sensor values will shut off the TRV
@@ -64,7 +56,6 @@ variables:
   external_temp_sensor: !input external_temp_sensor
   external_temp_comparator: !input external_temp_comparator
   external_contact_sensor: !input external_contact_sensor
-  aqara_trv_shutoff_method: !input aqara_trv_shutoff_method
 trigger:
   - platform: state
     entity_id: !input external_temp_sensor
