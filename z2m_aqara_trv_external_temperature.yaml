@@ -27,7 +27,6 @@ blueprint:
             - max
             - avg
       default: avg
-
     external_contact_sensor:
       name: External contact sensor
       description: Doors Contact sensor values will shut off the TRV
