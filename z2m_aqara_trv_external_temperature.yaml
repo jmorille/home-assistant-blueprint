@@ -46,7 +46,7 @@ blueprint:
           options:
             - away
             - off
-      default: offed
+      default: away
 
     aqara_trv_device:
       name: The Aqara TRV
