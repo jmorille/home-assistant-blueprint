@@ -20,7 +20,6 @@ blueprint:
       description: This temperature comparator from sensors values
       selector:
         select:
-        select:
           options:
             - first
             - last
