@@ -111,7 +111,9 @@ action:
   - parallel:
       - if:
           - condition: or
-            conditions: 
+            conditions:
+              - condition: template
+                value_template: "{{ True }}"            
               - condition: trigger
                 id:
                   - temp-change
