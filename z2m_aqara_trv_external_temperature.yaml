@@ -116,7 +116,7 @@ action:
                 id:
                   - temp-change
               - condition: template
-                 value_template: "{{ true }}"  
+                value_template: "{{ True }}"  
         then:
           # ### Check TRV config from external temperature sensor ### #
           # ### ################################################# ### #      
