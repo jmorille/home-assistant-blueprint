@@ -148,10 +148,13 @@ action:
                   
           # ### Publish external temperature ### #
           # ### ############################ ### #      
-          # Repeat for all names
+          # Use sensor_temp zigbee2mqtt api
+          # With call service
           - service: number.set_value
             target:
               entity_id: "{{aqara_trv_sensor_temp_entity}}"
+            data:
+              value: "{{ aqara_compute_temperature | float }}"  
       - choose:
           # ### Test Radiator for Turn OFF ### #
           # ### ########################## ### #      
