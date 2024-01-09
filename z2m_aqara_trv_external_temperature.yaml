@@ -150,10 +150,8 @@ action:
           # ### ############################ ### #      
           # Repeat for all names
           - service: number.set_value
-              target:
-                entity_id:
-                  target:
-                    entity_id: "{{aqara_trv_sensor_temp_entity}}"
+            target:
+              entity_id: "{{aqara_trv_sensor_temp_entity}}"
       - choose:
           # ### Test Radiator for Turn OFF ### #
           # ### ########################## ### #      
