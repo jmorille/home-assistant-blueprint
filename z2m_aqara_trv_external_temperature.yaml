@@ -151,10 +151,11 @@ action:
           # Use sensor_temp zigbee2mqtt api
           # With call service
           - service: number.set_value
-            target:
-              entity_id: "{{aqara_trv_sensor_temp_entity}}"
+            metadata: {}
             data:
               value: "{{ aqara_compute_temperature | float }}"  
+            target:
+              entity_id: "{{aqara_trv_sensor_temp_entity}}"
       - choose:
           # ### Test Radiator for Turn OFF ### #
           # ### ########################## ### #      
