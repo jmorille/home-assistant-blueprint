@@ -217,9 +217,9 @@ action:
                       - condition: template
                         value_template: "{{ aqara_trv_shutoff == 'away' }}"
                     sequence:
-                      # Radiator ON: by Preset Auto Mode config temp consigne 
+                      # Radiator ON: by Preset Manual Mode config temp consigne 
                       - service: climate.set_preset_mode
                         target:
                           entity_id: "{{aqara_trv_climate_entity}}"
                         data:
-                          preset_mode: auto
+                          preset_mode: manual
