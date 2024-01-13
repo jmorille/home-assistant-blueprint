@@ -198,9 +198,9 @@ action:
                   - condition: trigger
                     id:
                       - window-close
-                  - condition: template
-                    value_template: >-
-                      {{ expand(external_contact_sensor) |  selectattr('state', 'eq', 'on')  | list | count == 0 }}
+#                  - condition: template
+#                    value_template: >-
+#                      {{ expand(external_contact_sensor) |  selectattr('state', 'eq', 'on')  | list | count == 0 }}
             sequence:
               # Radiator check Turn ON Method
               - choose:
