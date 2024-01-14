@@ -223,3 +223,7 @@ action:
                           entity_id: "{{aqara_trv_climate_entity}}"
                         data:
                           preset_mode: manual
+                      - service: climate.turn_on
+                        target:
+                          entity_id: "{{aqara_trv_climate_entity}}"
+                        data: {}
