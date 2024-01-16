@@ -153,7 +153,7 @@ action:
           - service: number.set_value
             metadata: {}
             data:
-              value: "{{ aqara_compute_temperature | float | round(1) }}"  
+              value: "{{ aqara_compute_temperature | float | round(2) }}"  
             target:
               entity_id: "{{aqara_trv_sensor_temp_entity}}"
       - choose:
