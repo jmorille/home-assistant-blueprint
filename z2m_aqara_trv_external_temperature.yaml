@@ -1,9 +1,11 @@
 blueprint:
   name: Aqara TRV E1 external temperature
-  description: >
-    Manage the Aqara TRV from external temperature sensor event or door contact event.
+  description: 'Manage the Aqara TRV from external temperature sensor event or door/window
+    contact event.
+
+    '
   domain: automation
-  source_url: "https://github.com/jmorille/home-assistant-blueprint/z2m_aqara_trv_external_temperature.yaml"
+  source_url: https://github.com/jmorille/home-assistant-blueprint/blob/main/z2m_aqara_trv_external_temperature.yaml
   input:
     external_temp_sensor:
       name: External temperature sensor
@@ -12,43 +14,50 @@ blueprint:
         entity:
           multiple: true
           filter:
-            domain: sensor
+          - domain:
+            - sensor
             device_class:
-              - temperature
+            - temperature
     external_temp_comparator:
       name: Temperature comparator from sensors
       description: This temperature comparator from sensors values
       selector:
         select:
           options:
-            - min
-            - max
-            - avg
-            - first
-            - last
+          - min
+          - max
+          - avg
+          - first
+          - last
+          custom_value: false
+          multiple: false
+          sort: false
       default: avg
-
     external_contact_sensor:
       name: External contact sensor
-      description: Doors Contact sensor values will shut off the TRV
+      description: Door/window contact sensors; any open contact shuts off the TRV,
+        heating resumes only when all are closed
       selector:
         entity:
           multiple: true
           filter:
-            domain: binary_sensor
+          - domain:
+            - binary_sensor
             device_class:
-              - door
-        
+            - door
+            - window
     aqara_trv_shutoff:
       name: Aqara TRV shutoff methods
       description: The shutoff when contact is open
       selector:
         select:
           options:
-            - away
-            - close
+          - away
+          - close
+          custom_value: false
+          multiple: false
+          sort: false
       default: away
-
     aqara_trv_device:
       name: The Aqara TRV
       description: The TRV that the temperature willl be set to
@@ -56,174 +65,104 @@ blueprint:
         device:
           multiple: true
           filter:
-            - integration: mqtt
-              manufacturer: Xiaomi
-              model: Aqara Smart Radiator Thermostat E1 (SRTS-A01)
+          - integration: mqtt
+            manufacturer: Xiaomi
+            model: Aqara Smart Radiator Thermostat E1 (SRTS-A01)
 mode: restart
 max_exceeded: silent
-
 variables:
   aqara_trv_device: !input aqara_trv_device
   external_temp_sensor: !input external_temp_sensor
   external_temp_comparator: !input external_temp_comparator
   external_contact_sensor: !input external_contact_sensor
   aqara_trv_shutoff: !input aqara_trv_shutoff
-  
-trigger:
-  - platform: state
-    entity_id: !input external_temp_sensor
-    id: temp-change
-  - platform: state
-    entity_id: !input external_contact_sensor
-    to: "on"
-    id: window-open
-  - platform: state
-    entity_id: !input external_contact_sensor
-    to: "off"
-    id: window-close
-action:
-  - variables:
-#      aqara_trv_device_name: "{{ aqara_trv_device | map('device_attr', 'name') | list }}"
-      aqara_trv_select_entity: >-   
-        {{ aqara_trv_device | map('device_entities') | sum(start=[]) | expand
-        | selectattr('attributes.options', 'contains', 'external')
-        | map(attribute='entity_id') | list
-        }}
-      aqara_trv_climate_entity: >-
-        {{ aqara_trv_device | map('device_entities') | sum(start=[]) | expand
-        | selectattr('attributes.hvac_modes', 'contains', 'off')
-        | map(attribute='entity_id') | list 
-        }}
-      aqara_trv_sensor_temp_entity: >-
-        {% set ns = namespace(sensor_temp=[])%} 
-        {% for elt in aqara_trv_climate_entity %}
-           {% set ns.sensor_temp = ns.sensor_temp + [elt+'_sensor_temp']%}  
-        {% endfor -%}
-        {{ ns.sensor_temp | replace('climate', 'number')  }}
-      aqara_compute_temperature: >-
-        {% set external_temp_list = expand(external_temp_sensor)  | map(attribute='state') | map('float')  | list -%}
-        {% if external_temp_comparator == 'min' -%}
-          {{ external_temp_list | min   }}
-        {%- elif external_temp_comparator == 'max' -%}
-          {{external_temp_list | max   }}
-        {%- elif external_temp_comparator == 'first' -%}
-          {{external_temp_list | first   }}          
-        {%- elif external_temp_comparator == 'last' -%}
-          {{external_temp_list | last   }}          
-        {%- else -%}
-          {{ ((external_temp_list | sum) / (external_temp_list | count)) | round(3) }}
-        {%- endif %} 
-
-  - parallel:
+triggers:
+- trigger: state
+  entity_id: !input external_temp_sensor
+  id: temp-change
+- trigger: state
+  entity_id: !input external_contact_sensor
+  from: 'off'
+  to: 'on'
+  id: window-open
+- trigger: state
+  entity_id: !input external_contact_sensor
+  from: 'on'
+  to: 'off'
+  id: window-close
+actions:
+- variables:
+    trv_entities: '{{ aqara_trv_device | map(''device_entities'') | sum(start=[]) }}'
+    aqara_trv_select_entity: '{{ trv_entities | select(''match'', ''select\.'') | expand
+      | selectattr(''attributes.options'', ''defined'') | selectattr(''attributes.options'',
+      ''contains'', ''external'') | map(attribute=''entity_id'') | list }}'
+    aqara_trv_climate_entity: '{{ trv_entities | select(''match'', ''climate\.'') | list }}'
+    aqara_trv_number_entity: '{{ trv_entities | select(''match'', ''number\..*_external_temperature_input$'')
+      | list }}'
+    external_temp_list: '{{ expand(external_temp_sensor) | map(attribute=''state'')
+      | select(''is_number'') | map(''float'') | list }}'
+    aqara_compute_temperature: "{% set l = external_temp_list %}{% if l | count == 0 -%}\n  none\n{%- elif external_temp_comparator == 'min' -%}\n  {{ l | min }}\n{%- elif external_temp_comparator == 'max' -%}\n  {{ l | max }}\n{%- elif external_temp_comparator == 'first' -%}\n  {{ l | first }}\n{%- elif external_temp_comparator == 'last' -%}\n  {{ l | last }}\n{%- else -%}\n  {{ ((l | sum) / (l | count)) | round(3) }}\n{%- endif %}"
+- parallel:
+  - sequence:
+    - if:
+      - condition: template
+        value_template: '{{ external_temp_list | count > 0 and aqara_trv_number_entity
+          | count > 0 }}'
+      then:
+      - variables:
+          aqara_trv_select_entity_internal: '{{ aqara_trv_select_entity | expand | selectattr(''state'',
+            ''eq'', ''internal'') | map(attribute=''entity_id'') | list }}'
       - if:
-          - condition: or
-            conditions:
-              - condition: template
-                value_template: "{{ True }}"            
-              - condition: trigger
-                id:
-                  - temp-change
-
+        - condition: template
+          value_template: '{{ aqara_trv_select_entity_internal | count > 0 }}'
         then:
-          # ### Check TRV config from external temperature sensor ### #
-          # ### ################################################# ### #      
-          - variables:
-              # Get all in internal states for change it   
-              aqara_trv_select_entity_internal: "{{ aqara_trv_select_entity | expand | selectattr('state', 'eq', 'internal')  | map(attribute='entity_id')  | list }}"
-
-          - if:
-              - condition: template
-                value_template: "{{ aqara_trv_select_entity_internal | count > 0 }}"
-            then:
-              - service: select.select_option
-                target:
-                  entity_id: "{{ aqara_trv_select_entity_internal }}"
-                data:
-                  option: external
-              - delay:
-                  hours: 0
-                  minutes: 0
-                  seconds: 1
-                  milliseconds: 0 
-                  
-          # ### Publish external temperature ### #
-          # ### ############################ ### #      
-          # Use sensor_temp zigbee2mqtt api
-          # With call service
-          - service: number.set_value
-            metadata: {}
-            data:
-              value: "{{ aqara_compute_temperature | float | round(2) }}"  
-            target:
-              entity_id: "{{aqara_trv_sensor_temp_entity}}"
-      - choose:
-          # ### Test Radiator for Turn OFF ### #
-          # ### ########################## ### #      
-          - conditions:
-              - condition: trigger
-                id:
-                  - window-open
-            sequence:
-              - service: climate.turn_off
-                target:
-                  entity_id: "{{aqara_trv_climate_entity}}"
-                data: {}
-              # Radiator Turn OFF
-              - choose:
-                  - conditions:
-                      - condition: template
-                        value_template: "{{ aqara_trv_shutoff == 'close' }}"
-                    sequence:
-                      # Radiator OFF: by Turn Off Service
-                      - service: climate.turn_off
-                        target:
-                          entity_id: "{{aqara_trv_climate_entity}}"
-                        data: {}
-                  - conditions:
-                      - condition: template
-                        value_template: "{{ aqara_trv_shutoff == 'away' }}"
-                    sequence:
-                      # Radiator OFF: by Preset Away Mode config temp consigne 
-                      - service: climate.set_preset_mode
-                        target:
-                          entity_id: "{{aqara_trv_climate_entity}}"
-                        data:
-                          preset_mode: away
-
-          # ### Test Radiator for Turn ON  ### #
-          # ### ########################## ### #
-          - conditions:
-              - condition: and
-                conditions:
-                  - condition: trigger
-                    id:
-                      - window-close
-#                  - condition: template
-#                    value_template: >-
-#                      {{ expand(external_contact_sensor) |  selectattr('state', 'eq', 'on')  | list | count == 0 }}
-            sequence:
-              # Radiator check Turn ON Method
-              - choose:
-                  - conditions:
-                      - condition: template
-                        value_template: "{{ aqara_trv_shutoff == 'close' }}"
-                    sequence:
-                      # Radiator ON: by Turn On Service
-                      - service: climate.turn_on
-                        target:
-                          entity_id: "{{aqara_trv_climate_entity}}"
-                        data: {}
-                  - conditions:
-                      - condition: template
-                        value_template: "{{ aqara_trv_shutoff == 'away' }}"
-                    sequence:
-                      # Radiator ON: by Preset Manual Mode config temp consigne 
-                      - service: climate.set_preset_mode
-                        target:
-                          entity_id: "{{aqara_trv_climate_entity}}"
-                        data:
-                          preset_mode: manual
-                      - service: climate.turn_on
-                        target:
-                          entity_id: "{{aqara_trv_climate_entity}}"
-                        data: {}
+        - action: select.select_option
+          target:
+            entity_id: '{{ aqara_trv_select_entity_internal }}'
+          data:
+            option: external
+        - delay:
+            seconds: 1
+      - action: number.set_value
+        data:
+          value: '{{ aqara_compute_temperature | float | round(2) }}'
+        target:
+          entity_id: '{{ aqara_trv_number_entity }}'
+  - choose:
+    - conditions:
+      - condition: trigger
+        id:
+        - window-open
+      sequence:
+      - action: climate.turn_off
+        target:
+          entity_id: '{{ aqara_trv_climate_entity }}'
+      - if:
+        - condition: template
+          value_template: '{{ aqara_trv_shutoff == ''away'' }}'
+        then:
+        - action: climate.set_preset_mode
+          target:
+            entity_id: '{{ aqara_trv_climate_entity }}'
+          data:
+            preset_mode: away
+    - conditions:
+      - condition: trigger
+        id:
+        - window-close
+      - condition: state
+        entity_id: !input external_contact_sensor
+        state: 'off'
+      sequence:
+      - if:
+        - condition: template
+          value_template: '{{ aqara_trv_shutoff == ''away'' }}'
+        then:
+        - action: climate.set_preset_mode
+          target:
+            entity_id: '{{ aqara_trv_climate_entity }}'
+          data:
+            preset_mode: manual
+      - action: climate.turn_on
+        target:
+          entity_id: '{{ aqara_trv_climate_entity }}'
