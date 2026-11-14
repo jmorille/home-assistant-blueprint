@@ -16,8 +16,8 @@ blueprint:
     setpoint). A TRV switched off by hand stays off.
 
     - The window state is re-applied after a Zigbee2MQTT/Home Assistant outage, when
-    the TRVs come back online, when a TRV starts heating while a window is open, and
-    on a manual run.
+    the TRVs come back online, when a TRV starts heating while a window is open, on
+    a manual run, and on every temperature update as a safety net.
 
     - A persistent notification reports a TRV that cannot be found (removed or re-paired
     device, missing entity).
@@ -211,10 +211,16 @@ actions:
       not is_state(c[0], 'unavailable') and ents | select('in', aqara_trv_number_entity)
       | list | count == 0 %}{% set ns.l = ns.l + [device_attr(d, 'name') ~ ': external
       temperature entity not found'] %}{% endif %}{% endfor %}{{ ns.l }}"
-- alias: Report TRVs that cannot be found
+    stale_scenes: "{% set ns = namespace(l=[]) %}{% if contact_open_long | count
+      == 0 %}{% for c in climate_available | reject('is_state', 'off') %}{% set s
+      = 'scene.trv_restore_' ~ c.split('.')[1] %}{% if expand(s) | count > 0 %}{%
+      set ns.l = ns.l + [s] %}{% endif %}{% endfor %}{% endif %}{{ ns.l }}"
+- alias: Report TRVs that cannot be found (not on temperature updates, to avoid
+    re-creating a dismissed notification every few minutes)
   if:
   - condition: template
-    value_template: '{{ config_problems | count > 0 }}'
+    value_template: '{{ trigger_id != ''temp-change'' and config_problems | count
+      > 0 }}'
   then:
   - action: persistent_notification.create
     data:
@@ -223,6 +229,15 @@ actions:
         configuration'
       message: "Re-select the TRVs in the automation.\n{{ config_problems | join('\n')
         }}"
+- alias: Forget snapshots of TRVs already heating again with no window open (resumed
+    by hand or by the device), so a later manual switch-off is respected
+  if:
+  - condition: template
+    value_template: '{{ stale_scenes | count > 0 }}'
+  then:
+  - action: scene.delete
+    target:
+      entity_id: '{{ stale_scenes }}'
 - parallel:
   - alias: Send the room temperature to the available TRVs
     sequence:
@@ -252,11 +267,10 @@ actions:
           entity_id: '{{ number_available }}'
   - alias: Apply the window state
     choose:
+    # Applied on every trigger, temperature updates included (~every 15 min):
+    # a safety net for TRVs that dropped out and came back.
     - alias: A contact has been open for the delay - snapshot and shut off
       conditions:
-      - alias: Window event, outage recovery, TRV heating while open, or manual run
-        condition: template
-        value_template: '{{ trigger_id != ''temp-change'' }}'
       - condition: template
         value_template: '{{ contact_open_long | count > 0 and climate_to_off | count
           > 0 }}'
@@ -284,10 +298,8 @@ actions:
           data:
             preset_mode: away
     - alias: Every available contact is closed - restore the TRVs shut off for a window
+        (only TRVs marked by a snapshot or the away preset)
       conditions:
-      - alias: Window event, outage recovery, or manual run
-        condition: template
-        value_template: '{{ trigger_id != ''temp-change'' }}'
       - condition: template
         value_template: '{{ contact_available | count > 0 and contact_open | count
           == 0 and climate_to_resume | count > 0 }}'
