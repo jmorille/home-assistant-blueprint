@@ -1,19 +1,36 @@
 blueprint:
   name: Aqara TRV E1 external temperature
-  description: 'Manage the Aqara TRV from external temperature sensor event or door/window
-    contact event.
+  author: jmorille
+  description: 'Drive Aqara E1 thermostatic radiator valves (Zigbee2MQTT) from an
+    external temperature sensor and shut them off while a door or window is open.
 
-    Window state is reconciled on every contact change (including recovery from
-    unavailable) and at Home Assistant start; unavailable contacts are ignored.
-    A window must stay open for the configured delay before the TRV is shut off.
+
+    - The room temperature (min, max, average, first or last of the sensors) is sent
+    to every available TRV, which is switched to its external sensor if needed.
+
+    - A door/window must stay open for the configured delay before the TRVs are shut
+    off. Heating resumes when every available contact is closed; unavailable contacts
+    are ignored.
+
+    - Before a shutoff, each TRV is snapshotted and restored afterwards (mode, preset,
+    setpoint). A TRV switched off by hand stays off.
+
+    - The window state is re-applied after a Zigbee2MQTT/Home Assistant outage, when
+    the TRVs come back online, when a TRV starts heating while a window is open, and
+    on a manual run.
+
+    - A persistent notification reports a TRV that cannot be found (removed or re-paired
+    device, missing entity).
 
     '
   domain: automation
   source_url: https://github.com/jmorille/home-assistant-blueprint/blob/main/z2m_aqara_trv_external_temperature.yaml
+  homeassistant:
+    min_version: 2024.10.0
   input:
     external_temp_sensor:
-      name: External temperature sensor
-      description: This temperature sensors from min values
+      name: External temperature sensors
+      description: Room temperature sensors sent to the TRVs.
       selector:
         entity:
           multiple: true
@@ -24,8 +41,8 @@ blueprint:
             - temperature
           reorder: false
     external_temp_comparator:
-      name: Temperature comparator from sensors
-      description: This temperature comparator from sensors values
+      name: Temperature comparator
+      description: How the values of several sensors are combined.
       selector:
         select:
           options:
@@ -39,10 +56,9 @@ blueprint:
           sort: false
       default: avg
     external_contact_sensor:
-      name: External contact sensor
-      description: Door/window contact sensors; any open contact shuts off the TRV,
-        heating resumes only when all available contacts are closed (unavailable
-        contacts are ignored)
+      name: Door/window contact sensors
+      description: Any contact open for the delay shuts the TRVs off; heating resumes
+        when every available contact is closed (unavailable contacts are ignored).
       selector:
         entity:
           multiple: true
@@ -54,8 +70,9 @@ blueprint:
             - window
           reorder: false
     aqara_trv_shutoff:
-      name: Aqara TRV shutoff methods
-      description: The shutoff when contact is open
+      name: Shutoff method
+      description: 'away: switch off and set the away preset (a TRV switched off by
+        hand is never turned back on). close: switch off only.'
       selector:
         select:
           options:
@@ -67,8 +84,8 @@ blueprint:
       default: away
     window_open_delay:
       name: Window open delay
-      description: How long a door/window must stay open before the TRV is shut
-        off. Short openings (airing a few seconds) are ignored.
+      description: How long a door/window must stay open before the TRVs are shut
+        off. Shorter openings are ignored.
       selector:
         duration: {}
       default:
@@ -76,8 +93,8 @@ blueprint:
         minutes: 0
         seconds: 30
     aqara_trv_device:
-      name: The Aqara TRV
-      description: The TRV that the temperature willl be set to
+      name: Aqara TRVs
+      description: The Aqara E1 TRVs driven by this automation.
       selector:
         device:
           multiple: true
@@ -85,8 +102,14 @@ blueprint:
           - integration: mqtt
             manufacturer: Xiaomi
             model: Aqara Smart Radiator Thermostat E1 (SRTS-A01)
-mode: restart
+# queued, not restart: a run that waits for devices after an outage must not be
+# cancelled by the next temperature update. Runs are otherwise a few ms long.
+mode: queued
+max: 10
 max_exceeded: silent
+trigger_variables:
+  trv_devices: !input aqara_trv_device
+  trv_contacts: !input external_contact_sensor
 variables:
   aqara_trv_device: !input aqara_trv_device
   external_temp_sensor: !input external_temp_sensor
@@ -100,10 +123,8 @@ variables:
 triggers:
 - trigger: state
   entity_id: !input external_temp_sensor
+  to: null
   id: temp-change
-# Transitions include unavailable/unknown -> on/off (Zigbee2MQTT or HA restart),
-# so a window opened/closed during an outage is caught.
-# Open: only once the contact has stayed open for the configured delay.
 - trigger: state
   entity_id: !input external_contact_sensor
   to: 'on'
@@ -116,15 +137,45 @@ triggers:
 - trigger: homeassistant
   event: start
   id: ha-start
+- trigger: template
+  value_template: "{% set c = trv_devices | map('device_entities') | sum(start=[])
+    | select('match', 'climate\\.') | list %}{{ c | count > 0 and c | reject('is_state',
+    ['unavailable', 'unknown']) | list | count == c | count }}"
+  id: trv-back
+- trigger: template
+  value_template: "{% set c = trv_devices | map('device_entities') | sum(start=[])
+    | select('match', 'climate\\.') | list %}{{ trv_contacts | select('is_state',
+    'on') | list | count > 0 and c | select('is_state', 'heat') | list | count > 0
+    }}"
+  id: trv-heat-while-open
 actions:
-- variables:
+- alias: Detect a recovery (outage, HA start, TRVs back online)
+  variables:
+    trigger_id: '{{ trigger.id | default('''') }}'
+    is_recovery: "{{ trigger_id in ['ha-start', 'trv-back'] or (trigger_id in ['window-open',
+      'window-close'] and trigger.from_state is defined and trigger.from_state is
+      not none and trigger.from_state.state in ['unavailable', 'unknown']) }}"
+- alias: After an outage, let the contacts and TRVs come back before deciding
+  if:
+  - condition: template
+    value_template: '{{ is_recovery }}'
+  then:
+  - delay:
+      seconds: 10
+- alias: Read the TRVs, sensors and contacts
+  variables:
     trv_entities: '{{ aqara_trv_device | map(''device_entities'') | sum(start=[]) }}'
     aqara_trv_select_entity: '{{ trv_entities | select(''match'', ''select\.'') |
       expand | selectattr(''attributes.options'', ''defined'') | selectattr(''attributes.options'',
       ''contains'', ''external'') | map(attribute=''entity_id'') | list }}'
     aqara_trv_climate_entity: '{{ trv_entities | select(''match'', ''climate\.'')
       | list }}'
-    aqara_trv_number_entity: '{{ trv_entities | select(''match'', ''number\..*_external_temperature_input$'')
+    aqara_trv_number_entity: "{% set ns = namespace(l=[]) %}{% for e in trv_entities
+      | select('match', 'number\\.') %}{% if e is match('.*_external_temperature_input$')
+      or (state_attr(e, 'device_class') == 'temperature' and state_attr(e, 'max')
+      | float(0) == 55) %}{% set ns.l = ns.l + [e] %}{% endif %}{% endfor %}{{ ns.l
+      }}"
+    number_available: '{{ aqara_trv_number_entity | reject(''is_state'', ''unavailable'')
       | list }}'
     external_temp_list: '{{ expand(external_temp_sensor) | map(attribute=''state'')
       | select(''is_number'') | map(''float'') | list }}'
@@ -137,29 +188,52 @@ actions:
     contact_available: '{{ external_contact_sensor | select(''is_state'', [''on'',
       ''off'']) | list }}'
     contact_open: '{{ contact_available | select(''is_state'', ''on'') | list }}'
-    # Open contacts that count for a shutoff: open for at least the delay
-    # (at HA start, last_changed is reset, so every open contact counts).
     contact_open_long: "{% set ns = namespace(l=[]) %}{% for e in contact_open %}{%
-      if (trigger.id | default('')) == 'ha-start' or (now() - states[e].last_changed).total_seconds()
+      if trigger_id == 'ha-start' or (now() - states[e].last_changed).total_seconds()
       >= (window_open_delay_s | float(0)) - 1 %}{% set ns.l = ns.l + [e] %}{% endif
       %}{% endfor %}{{ ns.l }}"
     climate_available: '{{ aqara_trv_climate_entity | reject(''is_state'', [''unavailable'',
       ''unknown'']) | list }}'
     climate_to_off: '{{ climate_available | reject(''is_state'', ''off'') | list }}'
-    climate_to_on: '{{ climate_available | select(''is_state'', ''off'') | list }}'
-    climate_to_away: '{{ climate_available | reject(''is_state_attr'', ''preset_mode'',
+    climate_to_away: '{{ climate_to_off | reject(''is_state_attr'', ''preset_mode'',
       ''away'') | list }}'
+    climate_to_resume: "{% set ns = namespace(l=[]) %}{% for c in climate_available
+      | select('is_state', 'off') %}{% set has_scene = expand('scene.trv_restore_'
+      ~ c.split('.')[1]) | count > 0 %}{% if aqara_trv_shutoff == 'away' %}{% if
+      has_scene or is_state_attr(c, 'preset_mode', 'away') %}{% set ns.l = ns.l +
+      [c] %}{% endif %}{% elif has_scene or (trigger_id == 'window-close' and not
+      is_recovery) %}{% set ns.l = ns.l + [c] %}{% endif %}{% endfor %}{{ ns.l }}"
+    config_problems: "{% set ns = namespace(l=[]) %}{% for d in aqara_trv_device
+      %}{% set ents = device_entities(d) %}{% set c = ents | select('match', 'climate\\.')
+      | list %}{% if device_attr(d, 'name') is none %}{% set ns.l = ns.l + ['device
+      ' ~ d ~ ' not found (removed or re-paired?)'] %}{% elif c | count == 0 %}{%
+      set ns.l = ns.l + [device_attr(d, 'name') ~ ': no climate entity'] %}{% elif
+      not is_state(c[0], 'unavailable') and ents | select('in', aqara_trv_number_entity)
+      | list | count == 0 %}{% set ns.l = ns.l + [device_attr(d, 'name') ~ ': external
+      temperature entity not found'] %}{% endif %}{% endfor %}{{ ns.l }}"
+- alias: Report TRVs that cannot be found
+  if:
+  - condition: template
+    value_template: '{{ config_problems | count > 0 }}'
+  then:
+  - action: persistent_notification.create
+    data:
+      notification_id: '{{ ''trv_blueprint_'' ~ this.entity_id }}'
+      title: '{{ this.attributes.friendly_name | default(this.entity_id) }}: TRV
+        configuration'
+      message: "Re-select the TRVs in the automation.\n{{ config_problems | join('\n')
+        }}"
 - parallel:
-  - sequence:
+  - alias: Send the room temperature to the available TRVs
+    sequence:
     - if:
       - condition: template
-        value_template: '{{ external_temp_list | count > 0 and aqara_trv_number_entity
-          | count > 0 }}'
+        value_template: '{{ external_temp_list | count > 0 and number_available |
+          count > 0 }}'
       then:
       - variables:
-          aqara_trv_select_entity_internal: '{{ aqara_trv_select_entity | expand |
-            selectattr(''state'', ''eq'', ''internal'') | map(attribute=''entity_id'')
-            | list }}'
+          aqara_trv_select_entity_internal: '{{ aqara_trv_select_entity | select(''is_state'',
+            ''internal'') | list }}'
       - if:
         - condition: template
           value_template: '{{ aqara_trv_select_entity_internal | count > 0 }}'
@@ -175,57 +249,76 @@ actions:
         data:
           value: '{{ aqara_compute_temperature | float | round(2) }}'
         target:
-          entity_id: '{{ aqara_trv_number_entity }}'
-  - choose:
-    # At least one available contact has been open for the delay: shut the TRVs off.
-    - conditions:
-      - condition: trigger
-        id:
-        - window-open
-        - window-close
-        - ha-start
+          entity_id: '{{ number_available }}'
+  - alias: Apply the window state
+    choose:
+    - alias: A contact has been open for the delay - snapshot and shut off
+      conditions:
+      - alias: Window event, outage recovery, TRV heating while open, or manual run
+        condition: template
+        value_template: '{{ trigger_id != ''temp-change'' }}'
       - condition: template
-        value_template: '{{ contact_open_long | count > 0 }}'
+        value_template: '{{ contact_open_long | count > 0 and climate_to_off | count
+          > 0 }}'
       sequence:
+      - alias: Snapshot each TRV (mode, preset, setpoint) to restore it later
+        repeat:
+          for_each: '{{ climate_to_off }}'
+          sequence:
+          - action: scene.create
+            data:
+              scene_id: '{{ ''trv_restore_'' ~ repeat.item.split(''.'')[1] }}'
+              snapshot_entities:
+              - '{{ repeat.item }}'
+      - action: climate.turn_off
+        target:
+          entity_id: '{{ climate_to_off }}'
       - if:
         - condition: template
-          value_template: '{{ climate_to_off | count > 0 }}'
-        then:
-        - action: climate.turn_off
-          target:
-            entity_id: '{{ climate_to_off }}'
-      - if:
-        - condition: template
-          value_template: '{{ aqara_trv_shutoff == ''away'' and climate_to_away
-            | count > 0 }}'
+          value_template: '{{ aqara_trv_shutoff == ''away'' and climate_to_away |
+            count > 0 }}'
         then:
         - action: climate.set_preset_mode
           target:
             entity_id: '{{ climate_to_away }}'
           data:
             preset_mode: away
-    # Every available contact is closed: resume heating on the TRVs still off.
-    # (A contact open for less than the delay blocks the resume; its own
-    # window-open trigger or its closing will reconcile later.)
-    - conditions:
-      - condition: trigger
-        id:
-        - window-open
-        - window-close
-        - ha-start
+    - alias: Every available contact is closed - restore the TRVs shut off for a window
+      conditions:
+      - alias: Window event, outage recovery, or manual run
+        condition: template
+        value_template: '{{ trigger_id != ''temp-change'' }}'
       - condition: template
         value_template: '{{ contact_available | count > 0 and contact_open | count
-          == 0 and climate_to_on | count > 0 }}'
+          == 0 and climate_to_resume | count > 0 }}'
       sequence:
-      - if:
-        - condition: template
-          value_template: '{{ aqara_trv_shutoff == ''away'' }}'
-        then:
-        - action: climate.set_preset_mode
-          target:
-            entity_id: '{{ climate_to_on }}'
-          data:
-            preset_mode: manual
-      - action: climate.turn_on
-        target:
-          entity_id: '{{ climate_to_on }}'
+      - repeat:
+          for_each: '{{ climate_to_resume }}'
+          sequence:
+          - variables:
+              restore_scene: '{{ ''scene.trv_restore_'' ~ repeat.item.split(''.'')[1]
+                }}'
+          - if:
+            - alias: Snapshot available (lost after a Home Assistant restart)
+              condition: template
+              value_template: '{{ expand(restore_scene) | count > 0 }}'
+            then:
+            - action: scene.turn_on
+              target:
+                entity_id: '{{ restore_scene }}'
+            - action: scene.delete
+              target:
+                entity_id: '{{ restore_scene }}'
+            else:
+            - if:
+              - condition: template
+                value_template: '{{ aqara_trv_shutoff == ''away'' }}'
+              then:
+              - action: climate.set_preset_mode
+                target:
+                  entity_id: '{{ repeat.item }}'
+                data:
+                  preset_mode: manual
+            - action: climate.turn_on
+              target:
+                entity_id: '{{ repeat.item }}'
