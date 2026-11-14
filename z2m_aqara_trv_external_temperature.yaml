@@ -3,6 +3,10 @@ blueprint:
   description: 'Manage the Aqara TRV from external temperature sensor event or door/window
     contact event.
 
+    Window state is reconciled on every contact change (including recovery from
+    unavailable) and at Home Assistant start; unavailable contacts are ignored.
+    A window must stay open for the configured delay before the TRV is shut off.
+
     '
   domain: automation
   source_url: https://github.com/jmorille/home-assistant-blueprint/blob/main/z2m_aqara_trv_external_temperature.yaml
@@ -18,6 +22,7 @@ blueprint:
             - sensor
             device_class:
             - temperature
+          reorder: false
     external_temp_comparator:
       name: Temperature comparator from sensors
       description: This temperature comparator from sensors values
@@ -36,7 +41,8 @@ blueprint:
     external_contact_sensor:
       name: External contact sensor
       description: Door/window contact sensors; any open contact shuts off the TRV,
-        heating resumes only when all are closed
+        heating resumes only when all available contacts are closed (unavailable
+        contacts are ignored)
       selector:
         entity:
           multiple: true
@@ -46,6 +52,7 @@ blueprint:
             device_class:
             - door
             - window
+          reorder: false
     aqara_trv_shutoff:
       name: Aqara TRV shutoff methods
       description: The shutoff when contact is open
@@ -58,6 +65,16 @@ blueprint:
           multiple: false
           sort: false
       default: away
+    window_open_delay:
+      name: Window open delay
+      description: How long a door/window must stay open before the TRV is shut
+        off. Short openings (airing a few seconds) are ignored.
+      selector:
+        duration: {}
+      default:
+        hours: 0
+        minutes: 0
+        seconds: 30
     aqara_trv_device:
       name: The Aqara TRV
       description: The TRV that the temperature willl be set to
@@ -76,32 +93,62 @@ variables:
   external_temp_comparator: !input external_temp_comparator
   external_contact_sensor: !input external_contact_sensor
   aqara_trv_shutoff: !input aqara_trv_shutoff
+  window_open_delay: !input window_open_delay
+  window_open_delay_s: '{{ (window_open_delay.days | default(0)) * 86400 + (window_open_delay.hours
+    | default(0)) * 3600 + (window_open_delay.minutes | default(0)) * 60 + (window_open_delay.seconds
+    | default(0)) }}'
 triggers:
 - trigger: state
   entity_id: !input external_temp_sensor
   id: temp-change
+# Transitions include unavailable/unknown -> on/off (Zigbee2MQTT or HA restart),
+# so a window opened/closed during an outage is caught.
+# Open: only once the contact has stayed open for the configured delay.
 - trigger: state
   entity_id: !input external_contact_sensor
-  from: 'off'
   to: 'on'
+  for: !input window_open_delay
   id: window-open
 - trigger: state
   entity_id: !input external_contact_sensor
-  from: 'on'
   to: 'off'
   id: window-close
+- trigger: homeassistant
+  event: start
+  id: ha-start
 actions:
 - variables:
     trv_entities: '{{ aqara_trv_device | map(''device_entities'') | sum(start=[]) }}'
-    aqara_trv_select_entity: '{{ trv_entities | select(''match'', ''select\.'') | expand
-      | selectattr(''attributes.options'', ''defined'') | selectattr(''attributes.options'',
+    aqara_trv_select_entity: '{{ trv_entities | select(''match'', ''select\.'') |
+      expand | selectattr(''attributes.options'', ''defined'') | selectattr(''attributes.options'',
       ''contains'', ''external'') | map(attribute=''entity_id'') | list }}'
-    aqara_trv_climate_entity: '{{ trv_entities | select(''match'', ''climate\.'') | list }}'
+    aqara_trv_climate_entity: '{{ trv_entities | select(''match'', ''climate\.'')
+      | list }}'
     aqara_trv_number_entity: '{{ trv_entities | select(''match'', ''number\..*_external_temperature_input$'')
       | list }}'
     external_temp_list: '{{ expand(external_temp_sensor) | map(attribute=''state'')
       | select(''is_number'') | map(''float'') | list }}'
-    aqara_compute_temperature: "{% set l = external_temp_list %}{% if l | count == 0 -%}\n  none\n{%- elif external_temp_comparator == 'min' -%}\n  {{ l | min }}\n{%- elif external_temp_comparator == 'max' -%}\n  {{ l | max }}\n{%- elif external_temp_comparator == 'first' -%}\n  {{ l | first }}\n{%- elif external_temp_comparator == 'last' -%}\n  {{ l | last }}\n{%- else -%}\n  {{ ((l | sum) / (l | count)) | round(3) }}\n{%- endif %}"
+    aqara_compute_temperature: "{% set l = external_temp_list %}{% if l | count ==
+      0 -%}\n  none\n{%- elif external_temp_comparator == 'min' -%}\n  {{ l | min
+      }}\n{%- elif external_temp_comparator == 'max' -%}\n  {{ l | max }}\n{%- elif
+      external_temp_comparator == 'first' -%}\n  {{ l | first }}\n{%- elif external_temp_comparator
+      == 'last' -%}\n  {{ l | last }}\n{%- else -%}\n  {{ ((l | sum) / (l | count))
+      | round(3) }}\n{%- endif %}"
+    contact_available: '{{ external_contact_sensor | select(''is_state'', [''on'',
+      ''off'']) | list }}'
+    contact_open: '{{ contact_available | select(''is_state'', ''on'') | list }}'
+    # Open contacts that count for a shutoff: open for at least the delay
+    # (at HA start, last_changed is reset, so every open contact counts).
+    contact_open_long: "{% set ns = namespace(l=[]) %}{% for e in contact_open %}{%
+      if (trigger.id | default('')) == 'ha-start' or (now() - states[e].last_changed).total_seconds()
+      >= (window_open_delay_s | float(0)) - 1 %}{% set ns.l = ns.l + [e] %}{% endif
+      %}{% endfor %}{{ ns.l }}"
+    climate_available: '{{ aqara_trv_climate_entity | reject(''is_state'', [''unavailable'',
+      ''unknown'']) | list }}'
+    climate_to_off: '{{ climate_available | reject(''is_state'', ''off'') | list }}'
+    climate_to_on: '{{ climate_available | select(''is_state'', ''off'') | list }}'
+    climate_to_away: '{{ climate_available | reject(''is_state_attr'', ''preset_mode'',
+      ''away'') | list }}'
 - parallel:
   - sequence:
     - if:
@@ -110,8 +157,9 @@ actions:
           | count > 0 }}'
       then:
       - variables:
-          aqara_trv_select_entity_internal: '{{ aqara_trv_select_entity | expand | selectattr(''state'',
-            ''eq'', ''internal'') | map(attribute=''entity_id'') | list }}'
+          aqara_trv_select_entity_internal: '{{ aqara_trv_select_entity | expand |
+            selectattr(''state'', ''eq'', ''internal'') | map(attribute=''entity_id'')
+            | list }}'
       - if:
         - condition: template
           value_template: '{{ aqara_trv_select_entity_internal | count > 0 }}'
@@ -129,30 +177,45 @@ actions:
         target:
           entity_id: '{{ aqara_trv_number_entity }}'
   - choose:
+    # At least one available contact has been open for the delay: shut the TRVs off.
     - conditions:
       - condition: trigger
         id:
         - window-open
+        - window-close
+        - ha-start
+      - condition: template
+        value_template: '{{ contact_open_long | count > 0 }}'
       sequence:
-      - action: climate.turn_off
-        target:
-          entity_id: '{{ aqara_trv_climate_entity }}'
       - if:
         - condition: template
-          value_template: '{{ aqara_trv_shutoff == ''away'' }}'
+          value_template: '{{ climate_to_off | count > 0 }}'
+        then:
+        - action: climate.turn_off
+          target:
+            entity_id: '{{ climate_to_off }}'
+      - if:
+        - condition: template
+          value_template: '{{ aqara_trv_shutoff == ''away'' and climate_to_away
+            | count > 0 }}'
         then:
         - action: climate.set_preset_mode
           target:
-            entity_id: '{{ aqara_trv_climate_entity }}'
+            entity_id: '{{ climate_to_away }}'
           data:
             preset_mode: away
+    # Every available contact is closed: resume heating on the TRVs still off.
+    # (A contact open for less than the delay blocks the resume; its own
+    # window-open trigger or its closing will reconcile later.)
     - conditions:
       - condition: trigger
         id:
+        - window-open
         - window-close
-      - condition: state
-        entity_id: !input external_contact_sensor
-        state: 'off'
+        - ha-start
+      - condition: template
+        value_template: '{{ contact_available | count > 0 and contact_open | count
+          == 0 and climate_to_on | count > 0 }}'
       sequence:
       - if:
         - condition: template
@@ -160,9 +223,9 @@ actions:
         then:
         - action: climate.set_preset_mode
           target:
-            entity_id: '{{ aqara_trv_climate_entity }}'
+            entity_id: '{{ climate_to_on }}'
           data:
             preset_mode: manual
       - action: climate.turn_on
         target:
-          entity_id: '{{ aqara_trv_climate_entity }}'
+          entity_id: '{{ climate_to_on }}'
